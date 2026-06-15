@@ -1,169 +1,93 @@
-const TaxSlab = require('../models/TaxSlab');
+const TaxSlab = require("../models/TaxSlab");
 
 exports.createTaxSlab = async (req, res) => {
   try {
-    const {
+    // NO AUTH CHECK
+    const { country, financialYear, slabName, slabs, standardDeduction, basicExemptionLimit, applicableForRegime } = req.body;
+
+    const taxSlab = new TaxSlab({
       country,
       financialYear,
       slabName,
       slabs,
       standardDeduction,
       basicExemptionLimit,
-      applicableForRegime
-    } = req.body;
-
-    // Validation
-    if (!country || !financialYear || !slabs || slabs.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields or empty slabs array'
-      });
-    }
-
-    // Validate slab ranges don't overlap
-    const sortedSlabs = [...slabs].sort((a, b) => a.minIncome - b.minIncome);
-    for (let i = 0; i < sortedSlabs.length - 1; i++) {
-      if (sortedSlabs[i].maxIncome >= sortedSlabs[i + 1].minIncome) {
-        return res.status(400).json({
-          success: false,
-          message: 'Tax slab ranges overlap. Please verify the ranges.'
-        });
-      }
-    }
-
-    const newTaxSlab = new TaxSlab({
-      country,
-      financialYear,
-      slabName,
-      slabs: sortedSlabs,
-      standardDeduction,
-      basicExemptionLimit,
       applicableForRegime,
-      createdBy: req.session.userId
+      status: "ACTIVE"
     });
 
-    await newTaxSlab.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Tax slab created successfully',
-      data: newTaxSlab
-    });
+    await taxSlab.save();
+    res.status(201).json({ success: true, data: taxSlab, message: "Tax slab created successfully" });
   } catch (error) {
-    console.error('Error creating tax slab:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create tax slab',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.getTaxSlabs = async (req, res) => {
   try {
-    const { country, financialYear, regime } = req.query;
+    // NO AUTH CHECK
+    const { country, financialYear } = req.query;
+    const filters = { status: "ACTIVE" };
 
-    const filter = { status: 'ACTIVE' };
-    if (country) filter.country = country;
-    if (financialYear) filter.financialYear = financialYear;
-    if (regime) filter.applicableForRegime = regime;
+    if (country) filters.country = country;
+    if (financialYear) filters.financialYear = financialYear;
 
-    const taxSlabs = await TaxSlab.find(filter)
-      .populate('createdBy', 'email')
-      .sort({ financialYear: -1 });
-
-    res.json({
-      success: true,
-      data: taxSlabs
-    });
+    const slabs = await TaxSlab.find(filters);
+    res.json({ success: true, data: slabs });
   } catch (error) {
-    console.error('Error fetching tax slabs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch tax slabs',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.calculateTax = async (req, res) => {
   try {
-    const {
-      grossSalary,
-      financialYear,
-      country,
-      regime = 'OLD'
-    } = req.body;
+    // NO AUTH CHECK
+    const { grossSalary, financialYear, country, regime } = req.body;
 
     if (!grossSalary || !financialYear || !country) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: grossSalary, financialYear, country'
-      });
+      return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    // Find applicable tax slab
     const taxSlab = await TaxSlab.findOne({
       country,
       financialYear,
-      status: 'ACTIVE',
-      $or: [
-        { applicableForRegime: regime },
-        { applicableForRegime: 'BOTH' }
-      ]
+      applicableForRegime: regime || "OLD"
     });
 
     if (!taxSlab) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tax slab not found for the given criteria'
-      });
+      return res.status(404).json({ success: false, message: "Tax slab not found" });
     }
 
-    // Calculate taxable income
-    let taxableIncome = grossSalary - (taxSlab.standardDeduction || 0);
-    if (taxableIncome < taxSlab.basicExemptionLimit) {
-      taxableIncome = 0;
-    }
+    const standardDeduction = taxSlab.standardDeduction || 50000;
+    const taxableIncome = Math.max(0, grossSalary - standardDeduction);
 
-    // Calculate tax based on slabs
-    let tax = 0;
-    let applicableSlab = null;
+    let tax = 0, surcharge = 0, cess = 0;
 
-    for (const slab of taxSlab.slabs) {
-      if (taxableIncome >= slab.minIncome && taxableIncome <= slab.maxIncome) {
-        const taxableAmount = taxableIncome - slab.minIncome;
-        tax = (taxableAmount * slab.taxRate) / 100;
-        applicableSlab = slab;
-        break;
+    for (let slab of taxSlab.slabs) {
+      if (taxableIncome > slab.minIncome) {
+        const income = Math.min(taxableIncome, slab.maxIncome) - slab.minIncome;
+        tax += (income * slab.taxRate) / 100;
+        surcharge += (income * (slab.surcharge || 0)) / 100;
+        cess += (income * (slab.cess || 0)) / 100;
       }
     }
 
-    // Calculate surcharge and cess
-    const surcharge = (tax * (applicableSlab?.surcharge || 0)) / 100;
-    const cess = (tax * (applicableSlab?.cess || 0)) / 100;
     const totalTax = tax + surcharge + cess;
+    const netTakeHome = grossSalary - totalTax;
 
     res.json({
       success: true,
       data: {
         grossSalary,
-        standardDeduction: taxSlab.standardDeduction,
         taxableIncome,
         tax: Math.round(tax),
         surcharge: Math.round(surcharge),
         cess: Math.round(cess),
         totalTax: Math.round(totalTax),
-        netTakeHome: Math.round(grossSalary - totalTax),
-        applicableSlab
+        netTakeHome: Math.round(netTakeHome)
       }
     });
   } catch (error) {
-    console.error('Error calculating tax:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to calculate tax',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -3,9 +3,16 @@ const session = require("express-session");
 const { RedisStore } = require("connect-redis");
 const redisClient = require("./config/redis");
 const cors = require("cors");
+const statutoryRoutes = require('./routes/statutory.routes');
+const taxSlabRoutes = require('./routes/tax-slab.routes');
+const pfConfigRoutes = require('./routes/pf-config.routes');
+const esiConfigRoutes = require('./routes/esi-config.routes');
+const ptConfigRoutes = require('./routes/pt-config.routes');
+const healthRoutes = require('./routes/health');
 
 const app = express();
 
+// ============ MIDDLEWARE ============
 app.use(express.json());
 app.use(cors({
   origin: "http://localhost:5173",
@@ -28,15 +35,9 @@ app.use(
   })
 );
 
-// ============ ROUTES ============
-// Module 1 Routes (from your friend)
-app.use("/api/auth", require("./routes/auth.routes"));
-app.use("/api/org", require("./routes/org.routes"));
+// ============ ROUTES (MUST BE BEFORE 404 HANDLER) ============
 
-// Module 2 Routes (your work)
-app.use("/api/statutory", require("./routes/statutory.routes"));
-
-// Health check route
+// Home route
 app.get("/", (req, res) => {
   res.json({ 
     message: "Payroll Backend API", 
@@ -45,12 +46,32 @@ app.get("/", (req, res) => {
   });
 });
 
-// 404 handler
+// Health check route - MOVED HERE BEFORE 404
+app.use('/api', healthRoutes);
+
+
+// Module 1 Routes (from your friend)
+app.use("/api/auth", require("./routes/auth.routes"));
+app.use("/api/org", require("./routes/org.routes"));
+
+
+// ✅ ADD ALL MODULE-2 ROUTES
+app.use("/api/statutory", statutoryRoutes);
+app.use("/api/tax-slabs", taxSlabRoutes); 
+app.use("/api/pf-config", pfConfigRoutes);
+app.use("/api/esi-config", esiConfigRoutes);
+app.use("/api/pt-config", ptConfigRoutes);
+
+
+
+// ============ ERROR HANDLERS (MUST BE LAST) ============
+
+// 404 handler - MUST BE AFTER ALL ROUTES
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Error handler
+// Error handler - MUST BE LAST
 app.use((err, req, res, next) => {
   console.error("Error:", err);
   res.status(500).json({ 

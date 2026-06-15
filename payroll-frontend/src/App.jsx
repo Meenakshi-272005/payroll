@@ -4,6 +4,8 @@ import StatutoryRulesPage from './pages/StatutoryRulesPage';
 import TaxSlabPage from './pages/TaxSlabPage';
 
 
+
+
 function App() {
   const [currentPage, setCurrentPage] = useState('statutory');
 
@@ -47,7 +49,7 @@ function App() {
       <nav className="bg-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Payroll System - Module 2
+            Payroll System - Statutory 
           </h1>
           <div className="flex gap-4">
             <button
@@ -70,6 +72,7 @@ function App() {
             >
               Tax Slabs
             </button>
+
           </div>
         </div>
       </nav>
@@ -78,6 +81,8 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {currentPage === 'statutory' && <StatutoryRulesPage />}
         {currentPage === 'tax' && <TaxSlabPage />}
+        
+
       </main>
     </div>
   );

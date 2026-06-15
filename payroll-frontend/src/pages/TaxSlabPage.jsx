@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
-function TaxSlabPage() {
+export default function TaxSlabPage() {
   const [taxSlabs, setTaxSlabs] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showCalculator, setShowCalculator] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [salary, setSalary] = useState("");
   const [calculationResult, setCalculationResult] = useState(null);
-  const [salary, setSalary] = useState('');
-  const [calculating, setCalculating] = useState(false);
+  const [formData, setFormData] = useState({
+    country: "India",
+    financialYear: "2025-2026",
+    slabName: "",
+    applicableForRegime: "OLD",
+    basicExemptionLimit: "",
+    standardDeduction: "",
+    slabs: []
+  });
 
-  // ✅ COMMENT OUT FETCH FOR NOW
-  /*
   useEffect(() => {
     fetchTaxSlabs();
   }, []);
@@ -17,172 +24,268 @@ function TaxSlabPage() {
   const fetchTaxSlabs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/statutory/tax-slabs', {
-        credentials: 'include'
-      });
-      const data = await response.json();
-      setTaxSlabs(data.data || []);
+      // ✅ FIXED: Using correct API path /api/
+      const response = await axios.get("/api/tax-slabs");
+      setTaxSlabs(response.data.data || []);
     } catch (error) {
-      console.error('Error fetching tax slabs:', error);
+      console.error("Error fetching tax slabs:", error);
+      setTaxSlabs([]);
+      alert("Failed to fetch tax slabs");
     } finally {
       setLoading(false);
     }
   };
-  */
 
-  const calculateTax = () => {
-    if (!salary || salary <= 0) {
-      alert('Please enter a valid salary amount');
+  const handleCreateTaxSlab = async (e) => {
+    e.preventDefault();
+    try {
+      // ✅ FIXED: Using correct API path
+      await axios.post("/api/tax-slabs", formData);
+      alert("Tax slab created successfully!");
+      setShowForm(false);
+      setFormData({
+        country: "India",
+        financialYear: "2025-2026",
+        slabName: "",
+        applicableForRegime: "OLD",
+        basicExemptionLimit: "",
+        standardDeduction: "",
+        slabs: []
+      });
+      fetchTaxSlabs();
+    } catch (error) {
+      console.error("Error creating tax slab:", error);
+      alert("Failed to create tax slab: " + error.response?.data?.error);
+    }
+  };
+
+  const calculateTax = async () => {
+    if (!salary) {
+      alert("Please enter a salary amount");
       return;
     }
 
-    setCalculating(true);
-    
-    // Simple tax calculation (demo)
-    setTimeout(() => {
-      const grossSalary = parseFloat(salary);
-      const standardDeduction = 50000;
-      const taxableIncome = grossSalary - standardDeduction;
-      
-      let tax = 0;
-      if (taxableIncome <= 300000) {
-        tax = 0;
-      } else if (taxableIncome <= 700000) {
-        tax = (taxableIncome - 300000) * 0.05;
-      } else if (taxableIncome <= 1000000) {
-        tax = 20000 + (taxableIncome - 700000) * 0.20;
-      } else {
-        tax = 80000 + (taxableIncome - 1000000) * 0.30;
-      }
-
-      const cess = tax * 0.04;
-      const totalTax = tax + cess;
-      const netTakeHome = grossSalary - totalTax;
-
-      setCalculationResult({
-        tax: tax,
-        surcharge: 0,
-        cess: cess,
-        netTakeHome: netTakeHome
+    try {
+      // ✅ FIXED: Using correct API path
+      const response = await axios.post("/api/tax-slabs/calculate", {
+        grossSalary: parseFloat(salary),
+        financialYear: "2025-2026",
+        country: "India",
+        regime: "OLD"
       });
-      
-      setCalculating(false);
-    }, 1000);
+      setCalculationResult(response.data.data);
+    } catch (error) {
+      console.error("Error calculating tax:", error);
+      alert("Failed to calculate tax");
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Tax Calculator Card */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Tax Calculator</h2>
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">Income Tax Slabs</h1>
           <button
-            onClick={() => setShowCalculator(!showCalculator)}
-            className="text-blue-600 hover:text-blue-800 font-semibold"
+            onClick={() => setShowForm(!showForm)}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
           >
-            {showCalculator ? 'Hide' : 'Show'} Calculator
+            {showForm ? "Cancel" : "+ Add New Tax Slab"}
           </button>
         </div>
 
-        {showCalculator && (
-          <div className="space-y-4">
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Annual Gross Salary (₹)
-                </label>
-                <input
-                  type="number"
-                  value={salary}
-                  onChange={(e) => setSalary(e.target.value)}
-                  placeholder="Enter annual salary (e.g., 500000)"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={calculateTax}
-                  disabled={calculating}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-8 py-2 rounded-lg font-semibold transition-colors"
-                >
-                  {calculating ? 'Calculating...' : 'Calculate Tax'}
-                </button>
-              </div>
-            </div>
-
-            {calculationResult && (
-              <div className="mt-6 bg-gradient-to-br from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
-                <h3 className="font-bold text-lg mb-4 text-gray-800">Tax Calculation Result</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <p className="text-sm text-gray-600 mb-1">Gross Salary</p>
-                    <p className="text-xl font-bold text-gray-800">₹{parseFloat(salary).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <p className="text-sm text-gray-600 mb-1">Standard Deduction</p>
-                    <p className="text-xl font-bold text-gray-800">₹50,000</p>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <p className="text-sm text-gray-600 mb-1">Taxable Income</p>
-                    <p className="text-xl font-bold text-gray-800">₹{(parseFloat(salary) - 50000).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <p className="text-sm text-gray-600 mb-1">Income Tax</p>
-                    <p className="text-xl font-bold text-red-600">₹{Math.round(calculationResult.tax).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <p className="text-sm text-gray-600 mb-1">Health Cess (4%)</p>
-                    <p className="text-xl font-bold text-red-600">₹{Math.round(calculationResult.cess).toLocaleString()}</p>
-                  </div>
-                  <div className="col-span-2 md:col-span-1 bg-green-600 p-4 rounded-lg shadow-lg">
-                    <p className="text-sm text-white mb-1">Net Take Home</p>
-                    <p className="text-2xl font-bold text-white">₹{Math.round(calculationResult.netTakeHome).toLocaleString()}</p>
-                  </div>
+        {/* Create Form */}
+        {showForm && (
+          <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 className="text-xl font-bold mb-4">Create Tax Slab</h2>
+            <form onSubmit={handleCreateTaxSlab} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Slab Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g., Income Tax Slabs - Old Regime"
+                    value={formData.slabName}
+                    onChange={(e) => setFormData({ ...formData, slabName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Financial Year</label>
+                  <input
+                    type="text"
+                    placeholder="2025-2026"
+                    value={formData.financialYear}
+                    onChange={(e) => setFormData({ ...formData, financialYear: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Basic Exemption Limit</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="250000"
+                    value={formData.basicExemptionLimit}
+                    onChange={(e) => setFormData({ ...formData, basicExemptionLimit: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Standard Deduction</label>
+                  <input
+                    type="number"
+                    placeholder="50000"
+                    value={formData.standardDeduction}
+                    onChange={(e) => setFormData({ ...formData, standardDeduction: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Regime</label>
+                  <select
+                    value={formData.applicableForRegime}
+                    onChange={(e) => setFormData({ ...formData, applicableForRegime: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  >
+                    <option value="OLD">Old Regime</option>
+                    <option value="NEW">New Regime</option>
+                  </select>
                 </div>
               </div>
-            )}
+              <button
+                type="submit"
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+              >
+                Create Tax Slab
+              </button>
+            </form>
           </div>
         )}
-      </div>
 
-      {/* Tax Slabs List */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Tax Slabs Configuration</h2>
-          <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold">
-            + Create Tax Slab
-          </button>
-        </div>
-
-        {taxSlabs.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">💰</div>
-            <p className="text-gray-500 text-lg mb-2">No tax slabs configured</p>
-            <p className="text-gray-400 text-sm">Create tax slabs for different financial years</p>
-            <button className="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg">
-              Create First Tax Slab
+        {/* Calculator */}
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-xl font-bold mb-4">Tax Calculator</h2>
+          <div className="flex gap-4 mb-6">
+            <input
+              type="number"
+              value={salary}
+              onChange={(e) => setSalary(e.target.value)}
+              placeholder="Enter annual salary"
+              className="flex-1 border border-gray-300 rounded-lg px-4 py-2"
+            />
+            <button
+              onClick={calculateTax}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+            >
+              Calculate
             </button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {taxSlabs.map((slab) => (
-              <div key={slab._id} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-                {/* Tax slab content here */}
+
+          {calculationResult && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-bold mb-4">Calculation Result</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Gross Salary</p>
+                  <p className="text-lg font-bold">
+                    ₹ {calculationResult.grossSalary?.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Taxable Income</p>
+                  <p className="text-lg font-bold">
+                    ₹ {calculationResult.taxableIncome?.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Income Tax</p>
+                  <p className="text-lg font-bold text-red-600">
+                    ₹ {calculationResult.tax?.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Surcharge</p>
+                  <p className="text-lg font-bold text-red-600">
+                    ₹ {calculationResult.surcharge?.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Cess</p>
+                  <p className="text-lg font-bold text-red-600">
+                    ₹ {calculationResult.cess?.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div className="bg-green-50 p-3 rounded">
+                  <p className="text-sm text-gray-600">Net Take Home</p>
+                  <p className="text-lg font-bold text-green-600">
+                    ₹ {calculationResult.netTakeHome?.toLocaleString() || 0}
+                  </p>
+                </div>
               </div>
-            ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tax Slabs Table */}
+        {loading ? (
+          <div className="text-center py-8">Loading...</div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-100 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    Financial Year
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    Slab Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    Standard Deduction
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    Basic Exemption
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    Regime
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(taxSlabs?.length ?? 0) === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                      No tax slabs found. Create one to get started.
+                    </td>
+                  </tr>
+                ) : (
+                  taxSlabs.map((slab) => (
+                    <tr key={slab._id} className="border-b hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {slab.financialYear}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {slab.slabName}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        ₹ {slab.standardDeduction?.toLocaleString() || "N/A"}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        ₹ {slab.basicExemptionLimit?.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {slab.applicableForRegime}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
     </div>
   );
 }
-
-export default TaxSlabPage;

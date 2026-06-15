@@ -1,46 +1,41 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE = '/api/v1';
+const API_BASE = "/api";
+
 
 export const complianceService = {
   // Statutory Rules
-  createStatutoryRule: (data) => 
-    axios.post(`${API_BASE}/statutory-rules`, data, { withCredentials: true }),
-  
-  getStatutoryRules: (filters) => 
-    axios.get(`${API_BASE}/statutory-rules`, { params: filters, withCredentials: true }),
-  
-  updateStatutoryRule: (ruleId, data) => 
-    axios.put(`${API_BASE}/statutory-rules/${ruleId}`, data, { withCredentials: true }),
-  
-  archiveStatutoryRule: (ruleId) => 
-    axios.delete(`${API_BASE}/statutory-rules/${ruleId}`, { withCredentials: true }),
+  createStatutoryRule: (data) =>
+    axios.post(`${API_BASE}/statutory`, data),
+  // NO withCredentials
+  getStatutoryRules: (filters) =>
+    axios.get(`${API_BASE}/statutory`, { params: filters }),
+  updateStatutoryRule: (ruleId, data) =>
+    axios.put(`${API_BASE}/statutory/${ruleId}`, data),
+  archiveStatutoryRule: (ruleId) =>
+    axios.delete(`${API_BASE}/statutory/${ruleId}`),
 
   // Tax Slabs
-  getTaxSlabs: (filters) => 
-    axios.get(`${API_BASE}/tax-slabs`, { params: filters, withCredentials: true }),
-  
-  calculateTax: (data) => 
-    axios.post(`${API_BASE}/tax-slabs/calculate`, data, { withCredentials: true }),
+  getTaxSlabs: (filters) =>
+    axios.get(`${API_BASE}/tax-slabs`, { params: filters }),
+  calculateTax: (data) =>
+    axios.post(`${API_BASE}/tax-slabs/calculate`, data),
 
   // PF Configuration
-  getPFConfig: (filters) => 
-    axios.get(`${API_BASE}/pf-config`, { params: filters, withCredentials: true }),
-  
-  calculatePFDeduction: (data) => 
-    axios.post(`${API_BASE}/pf-config/calculate`, data, { withCredentials: true }),
+  getPFConfig: (filters) =>
+    axios.get(`${API_BASE}/pf-config`, { params: filters }),
+  calculatePFDeduction: (data) =>
+    axios.post(`${API_BASE}/pf-config/calculate`, data),
 
   // ESI Configuration
-  getESIConfig: (filters) => 
-    axios.get(`${API_BASE}/esi-config`, { params: filters, withCredentials: true }),
-  
-  calculateESIDeduction: (data) => 
-    axios.post(`${API_BASE}/esi-config/calculate`, data, { withCredentials: true }),
+  getESIConfig: (filters) =>
+    axios.get(`${API_BASE}/esi-config`, { params: filters }),
+  calculateESIDeduction: (data) =>
+    axios.post(`${API_BASE}/esi-config/calculate`, data),
 
   // Professional Tax
-  getPTConfig: (filters) => 
-    axios.get(`${API_BASE}/pt-config`, { params: filters, withCredentials: true }),
-  
-  calculatePTDeduction: (data) => 
-    axios.post(`${API_BASE}/pt-config/calculate`, data, { withCredentials: true })
+  getPTConfig: (filters) =>
+    axios.get(`${API_BASE}/pt-config`, { params: filters }),
+  calculatePTDeduction: (data) =>
+    axios.post(`${API_BASE}/pt-config/calculate`, data)
 };

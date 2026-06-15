@@ -1,56 +1,85 @@
+// payroll-backend/models/TaxSlab.js
 const mongoose = require('mongoose');
 
-const TaxSlabSchema = new mongoose.Schema({
-  country: {
-    type: String,
-    required: true
+const TaxSlabSchema = new mongoose.Schema(
+  {
+    country: {
+      type: String,
+      required: true,
+      enum: ['India'],
+      default: 'India'
+    },
+    financialYear: {
+      type: String,
+      required: true,
+      match: /^\d{4}-\d{4}$/
+    },
+    slabName: {
+      type: String,
+      required: true
+    },
+    slabs: [
+      {
+        minIncome: {
+          type: Number,
+          required: true,
+          min: 0
+        },
+        maxIncome: {
+          type: Number,
+          required: true
+        },
+        taxRate: {
+          type: Number,
+          required: true,
+          min: 0,
+          max: 100
+        },
+        surcharge: {
+          type: Number,
+          required: false,
+          min: 0,
+          max: 100
+        },
+        cess: {
+          type: Number,
+          required: false,
+          min: 0,
+          max: 100
+        }
+      }
+    ],
+    standardDeduction: {
+      type: Number,
+      required: false,
+      min: 0
+    },
+    basicExemptionLimit: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    applicableForRegime: {
+      type: String,
+      enum: ['OLD', 'NEW'],
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'INACTIVE'],
+      default: 'ACTIVE'
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
   },
-  financialYear: {
-    type: String,  // Format: 2025-2026
-    required: true
-  },
-  slabName: {
-    type: String,
-    required: true
-  },
-  
-  // Slab ranges and rates
-  slabs: [{
-    minIncome: { type: Number, required: true },
-    maxIncome: { type: Number, required: true },
-    taxRate: { type: Number, required: true },  // percentage
-    surcharge: { type: Number, default: 0 },
-    cess: { type: Number, default: 0 }
-  }],
-  
-  // Standard deductions
-  standardDeduction: Number,
-  basicExemptionLimit: Number,
-  
-  // Additional info
-  description: String,
-  applicableForRegime: {
-    type: String,
-    enum: ['OLD', 'NEW', 'BOTH'],
-    default: 'OLD'
-  },
-  
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'],
-    default: 'ACTIVE'
-  },
-  
-  version: { type: Number, default: 1 }
-  
-}, { timestamps: true });
+  {
+    timestamps: true,
+    collection: 'tax_slabs'
+  }
+);
 
-TaxSlabSchema.index({ country: 1, financialYear: 1 });
-TaxSlabSchema.index({ status: 1 });
+TaxSlabSchema.index({ country: 1, financialYear: 1, applicableForRegime: 1 });
 
 module.exports = mongoose.model('TaxSlab', TaxSlabSchema);

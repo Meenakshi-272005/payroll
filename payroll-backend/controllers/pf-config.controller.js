@@ -1,145 +1,83 @@
-const PFConfig = require('../models/PFConfig');
+const PFConfig = require("../models/PFConfig");
 
 exports.createPFConfig = async (req, res) => {
   try {
-    const {
+    // NO AUTH CHECK
+    const { country, state, effectiveYear, pfName, applicableSalaryThreshold, employeeContributionRate, employerContributionRate, adminChargeRate } = req.body;
+
+    const pfConfig = new PFConfig({
       country,
       state,
       effectiveYear,
-      employeeContributionRate,
-      employerContributionRate,
-      applicableSalaryThreshold
-    } = req.body;
-
-    if (!country || !state || !effectiveYear || !employeeContributionRate || !employerContributionRate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields'
-      });
-    }
-
-    const newPFConfig = new PFConfig({
-      country,
-      state,
-      effectiveYear,
-      employeeContributionRate,
-      employerContributionRate,
+      pfName,
       applicableSalaryThreshold,
-      createdBy: req.session.userId
+      employeeContributionRate,
+      employerContributionRate,
+      adminChargeRate,
+      status: "ACTIVE"
     });
 
-    await newPFConfig.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'PF configuration created successfully',
-      data: newPFConfig
-    });
+    await pfConfig.save();
+    res.status(201).json({ success: true, data: pfConfig, message: "PF Config created successfully" });
   } catch (error) {
-    console.error('Error creating PF config:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create PF configuration',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.getPFConfig = async (req, res) => {
   try {
-    const { country, state, year } = req.query;
+    // NO AUTH CHECK
+    const { country, state, effectiveYear } = req.query;
+    const filters = { status: "ACTIVE" };
 
-    const filter = { status: 'ACTIVE' };
-    if (country) filter.country = country;
-    if (state) filter.state = state;
-    if (year) filter.effectiveYear = parseInt(year);
+    if (country) filters.country = country;
+    if (state) filters.state = state;
+    if (effectiveYear) filters.effectiveYear = parseInt(effectiveYear);
 
-    const pfConfig = await PFConfig.findOne(filter);
-
-    if (!pfConfig) {
-      return res.status(404).json({
-        success: false,
-        message: 'PF configuration not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: pfConfig
-    });
+    const config = await PFConfig.find(filters);
+    res.json({ success: true, data: config });
   } catch (error) {
-    console.error('Error fetching PF config:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch PF configuration',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.calculatePFDeduction = async (req, res) => {
   try {
-    const { baseSalary, dearness, state, year } = req.body;
+    // NO AUTH CHECK
+    const { baseSalary, state, year } = req.body;
 
     if (!baseSalary || !state || !year) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: baseSalary, state, year'
-      });
+      return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
     const pfConfig = await PFConfig.findOne({
       state,
       effectiveYear: year,
-      status: 'ACTIVE'
+      status: "ACTIVE"
     });
 
     if (!pfConfig) {
-      return res.status(404).json({
-        success: false,
-        message: 'PF configuration not found'
-      });
+      return res.status(404).json({ success: false, message: "PF Config not found" });
     }
 
-    // Calculate PF eligible salary (Basic + DA)
-    const pfEligible = baseSalary + (dearness || 0);
-
-    if (pfEligible < pfConfig.applicableSalaryThreshold) {
-      return res.json({
-        success: true,
-        data: {
-          baseSalary,
-          dearness,
-          pfEligible,
-          applicable: false,
-          message: 'Salary below PF threshold, no contribution required'
-        }
-      });
-    }
-
+    // Monthly PF Calculation
+    const pfEligible = baseSalary; // or subset based on rules
     const employeeContribution = (pfEligible * pfConfig.employeeContributionRate) / 100;
     const employerContribution = (pfEligible * pfConfig.employerContributionRate) / 100;
-    const adminCharge = (pfEligible * pfConfig.adminChargeRate) / 100;
+    const adminCharge = (pfEligible * (pfConfig.adminChargeRate || 0.5)) / 100;
 
     res.json({
       success: true,
       data: {
         baseSalary,
-        dearness,
-        pfEligible,
-        employeeContribution: Math.round(employeeContribution),
-        employerContribution: Math.round(employerContribution),
-        adminCharge: Math.round(adminCharge),
-        totalPFCredit: Math.round(employeeContribution + employerContribution),
-        applicable: true
+        pfEligible: Math.round(pfEligible),
+        monthlyEmployeeContribution: Math.round(employeeContribution),
+        monthlyEmployerContribution: Math.round(employerContribution),
+        monthlyAdminCharge: Math.round(adminCharge),
+        totalMonthlyPFCredit: Math.round(employerContribution + employeeContribution + adminCharge)
       }
     });
   } catch (error) {
-    console.error('Error calculating PF deduction:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to calculate PF deduction',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
